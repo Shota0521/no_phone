@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 enum TimerMode {
   countdown,
@@ -30,6 +31,7 @@ class _TimerSettingsState extends State<TimerSettings> {
   late int _hours;
   late int _minutes;
   late int _seconds;
+  late String _selectedTag; // 選択されたタグを保持する変数
 
   @override
   void initState() {
@@ -38,6 +40,17 @@ class _TimerSettingsState extends State<TimerSettings> {
     _hours = widget.initialHours;
     _minutes = widget.initialMinutes;
     _seconds = widget.initialSeconds;
+    _selectedTag = ''; // 初期タグを設定（必要に応じて変更可能）
+  }
+
+  // 設定の保存
+  Future<void> _saveSettings() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('mode', _selectedMode.index);
+    await prefs.setInt('hours', _hours);
+    await prefs.setInt('minutes', _minutes);
+    await prefs.setInt('seconds', _seconds);
+    await prefs.setString('tag', _selectedTag); // 選択されたタグを保存
   }
 
   @override
@@ -74,14 +87,14 @@ class _TimerSettingsState extends State<TimerSettings> {
               },
             ),
           ),
-          
+
           // 時間設定
           Expanded(
             child: CupertinoTheme(
               data: const CupertinoThemeData(
                 textTheme: CupertinoTextThemeData(
                   pickerTextStyle: TextStyle(
-                    fontSize: 24,
+                    color: Colors.black, fontSize: 24,
                   ),
                 ),
               ),
@@ -131,7 +144,32 @@ class _TimerSettingsState extends State<TimerSettings> {
               ),
             ),
           ),
-
+          // タグの選択 (追加)
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: PopupMenuButton<String>(
+              onSelected: (String value) {
+                setState(() {
+                  _selectedTag = value; // 選択されたタグを更新
+                });
+              },
+              itemBuilder: (BuildContext context) {
+                return ['国語', '数学', '英語', '社会', '理科'].map((String tag) {
+                  return PopupMenuItem<String>(
+                    value: tag,
+                    child: Text(tag),
+                  );
+                }).toList();
+              },
+              child: Row(
+                children: const [
+                  Icon(Icons.label),
+                  SizedBox(width: 8),
+                  Text('タグを選択'),
+                ],
+              ),
+            ),
+          ),
           // 設定ボタン
           Padding(
             padding: const EdgeInsets.all(16.0),
@@ -143,7 +181,9 @@ class _TimerSettingsState extends State<TimerSettings> {
                   'hours': _hours,
                   'minutes': _minutes,
                   'seconds': _seconds,
+                  'tag': _selectedTag,
                 });
+                _saveSettings(); // 設定を保存
               },
               child: const Text('設定を保存'),
               style: ElevatedButton.styleFrom(

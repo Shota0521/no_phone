@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async'; // Timerを使用するためにインポート
+import 'package:shared_preferences/shared_preferences.dart';
 
 class Flower extends StatefulWidget {
   final int t;
+  final String selectedTag; // 選択されたタグを保持するための変数
 
-  const Flower({super.key, required this.t});
+  const Flower({super.key, required this.t, required this.selectedTag, required String focusText}); // selectedTagを追加
 
   @override
   _FlowerState createState() => _FlowerState();
@@ -14,34 +16,75 @@ class Flower extends StatefulWidget {
 class _FlowerState extends State<Flower> {
   late String imagePath;
   late Timer _timer;
-  int tValue = 0; // インクリメントする`t`の値
+  int tValue = 0;
 
   @override
   void initState() {
     super.initState();
 
-    // `t` に基づいた画像パスを設定
-    imagePath = 'images/${widget.t}.png';
-    tValue = widget.t; // 初期値として渡された`t`を設定
-
-    // 5秒ごとにtValueをインクリメント
-    _timer = Timer.periodic(const Duration(seconds: 3), (Timer t) {
+    // SharedPreferencesからtValueを読み込む
+    _loadTValue().then((value) {
       setState(() {
-        tValue++; // 5秒ごとにtValueをインクリメント
-        if(tValue>12){
-          tValue=0;
-        }
-        imagePath = 'images/$tValue.png'; // インクリメントされた`tValue`に基づいて画像パスを更新
-
+        tValue = value;
+        imagePath = _getImagePath(tValue); // 画像パスを設定
       });
+    });
+
+    // 1時間ごとに画像を変更
+    _timer = Timer.periodic(const Duration(seconds: 3600), (Timer t) {
+      if (tValue < 6) { // tValueが6未満の場合のみ画像を変更
+        setState(() {
+          tValue++; // tValueを増やす
+          imagePath = _getImagePath(tValue); // 新しい画像パスを取得
+          _saveTValue(); // 状態を保存
+        });
+      } else {
+        _timer.cancel(); // tValueが6になったらタイマーを停止
+      }
     });
   }
 
   @override
   void dispose() {
-    // Timerを停止
     _timer.cancel();
     super.dispose();
+  }
+
+  // SharedPreferencesからtValueを読み込むメソッド
+  Future<int> _loadTValue() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt('tValue') ?? widget.t; // 保存されていない場合は初期値を使用
+  }
+
+  // SharedPreferencesにtValueを保存するメソッド
+  Future<void> _saveTValue() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('tValue', tValue);
+  }
+
+  String _getImagePath(int value) {
+    // 選択されたタグに基づいて画像パスを設定
+    String prefix;
+    switch (widget.selectedTag) {
+      case '国語':
+        prefix = 'a';
+        break;
+      case '数学':
+        prefix = 'b';
+        break;
+      case '英語':
+        prefix = 'e';
+        break;
+      case '社会':
+        prefix = 'h';
+        break;
+      case '理科':
+        prefix = 'k';
+        break;
+      default:
+        prefix = '1'; // デフォルトの場合
+    }
+    return 'images/$prefix$value.jpg'; // 連番の画像パス
   }
 
   @override
@@ -49,35 +92,18 @@ class _FlowerState extends State<Flower> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('マイ花畑'),
-      ),
-      body: Center(
-        child: FutureBuilder(
-          // 画像が存在するか確認するための非同期処理
-          future: _imageExists(imagePath),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const CircularProgressIndicator();
-            } else if (snapshot.hasError || !snapshot.data!) {
-              // 画像が存在しない場合、デフォルト画像を表示
-              return Image.asset('images/1.png');
-            } else {
-              // 画像が存在する場合、指定された画像を表示
-              return Image.asset(imagePath);
-            }
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            _timer.cancel(); // 戻る前にタイマーを停止
+            _saveTValue(); // 状態を保存
+            Navigator.of(context).pop(); // メイン画面に戻る
           },
         ),
       ),
+      body: Center(
+        child: Image.asset(imagePath), // 画像を表示
+      ),
     );
-  }
-
-  // 画像ファイルが存在するか確認する非同期メソッド
-  Future<bool> _imageExists(String path) async {
-    try {
-      // 画像が存在するか確認する処理（パスに基づく検証）
-      final result = await rootBundle.load(path);
-      return true;  // 画像が存在する場合はtrueを返す
-    } catch (e) {
-      return false;  // 画像が存在しない場合はfalseを返す
-    }
   }
 }

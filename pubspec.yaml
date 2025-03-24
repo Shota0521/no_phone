@@ -35,6 +35,8 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.6
 
+  shared_preferences: ^2.3.3
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -45,6 +47,7 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^3.0.0
+
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -59,6 +62,48 @@ flutter:
 
   assets:
   - assets/images/
+  - assets/images/10.jpg
+  - assets/images/11.jpg
+  - assets/images/12.jpg
+  - assets/images/13.jpg
+  - assets/images/14.jpg
+  - assets/images/15.jpg
+  - assets/images/16.jpg
+  - assets/images/a0.jpg
+  - assets/images/a1.jpg
+  - assets/images/a2.jpg
+  - assets/images/a3.jpg
+  - assets/images/a4.jpg
+  - assets/images/a5.jpg
+  - assets/images/a6.jpg
+  - assets/images/b0.jpg
+  - assets/images/b1.jpg
+  - assets/images/b2.jpg
+  - assets/images/b3.jpg
+  - assets/images/b4.jpg
+  - assets/images/b5.jpg
+  - assets/images/b6.jpg
+  - assets/images/e0.jpg
+  - assets/images/e1.jpg
+  - assets/images/e2.jpg
+  - assets/images/e3.jpg
+  - assets/images/e4.jpg
+  - assets/images/e5.jpg
+  - assets/images/e6.jpg
+  - assets/images/h0.jpg
+  - assets/images/h1.jpg
+  - assets/images/h2.jpg
+  - assets/images/h3.jpg
+  - assets/images/h4.jpg
+  - assets/images/h5.jpg
+  - assets/images/h6.jpg
+  - assets/images/k0.jpg
+  - assets/images/k1.jpg
+  - assets/images/k2.jpg
+  - assets/images/k3.jpg
+  - assets/images/k4.jpg
+  - assets/images/k5.jpg
+  - assets/images/k6.jpg
 
   # To add assets to your application, add an assets section, like this:
   # assets:

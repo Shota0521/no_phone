@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:no_phone/Tm.dart';  // タイマーのモードを定義しているファイル
 import 'package:no_phone/person.dart'; // TimerSettingsに依存するためインポート
 import 'package:no_phone/flower.dart'; // flowerに依存するためインポート
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert'; // JSONデコードに必要
 
 void main() {
   runApp(const MyApp());
@@ -34,18 +36,59 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  TimerMode mode = TimerMode.countdown; // タイマーのモード
+  TimerMode mode = TimerMode.countdown;
   int hours = 0; // 時間
   int minutes = 0; // 分
   int seconds = 0; // 秒
-  Timer? _timer; // Timerオブジェクト
-  bool _isRunning = false; // タイマーが動作中かどうかを確認
-  int _totalSeconds = 0; // タイマーの総秒数
-  int _elapsedSeconds = 0; // 経過した秒数（カウントアップの場合）
-
+  Timer? _timer;
+  bool _isRunning = false;
+  int _totalSeconds = 0;
+  int _elapsedSeconds = 0;
   int t = 0;
-
   final TextEditingController _textController = TextEditingController();
+
+  // タグの種類を定義
+  final List<String> tags = ['国語', '数学', '英語', '社会', '理科'];
+  String? _selectedTag; // 選択されたタグを保持する変数
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings(); // 設定をロード
+    _incrementAppLaunchCount(); // アプリ起動回数をインクリメント
+  }
+
+  // 設定の読み込み
+  Future<void> _loadSettings() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    setState(() {
+      mode = TimerMode.values[prefs.getInt('mode') ?? 0];
+      hours = prefs.getInt('hours') ?? 0;
+      minutes = prefs.getInt('minutes') ?? 0;
+      seconds = prefs.getInt('seconds') ?? 0;
+      _selectedTag = prefs.getString('tag') ?? tags[0]; // デフォルトタグを設定
+      _textController.text = prefs.getString('focusText') ?? ''; // 集中したいテキストを設定
+    });
+    // タイマーモードに応じた初期設定
+    if (mode == TimerMode.countdown) {
+      _totalSeconds = (hours * 3600) + (minutes * 60) + seconds;
+    } else if (mode == TimerMode.countup) {
+      _elapsedSeconds = 0;
+    } else if (mode == TimerMode.pomodoro) {
+      _totalSeconds = 25 * 60;
+    }
+  }
+
+  // 設定の保存
+  Future<void> _saveSettings() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('mode', mode.index);
+    await prefs.setInt('hours', hours);
+    await prefs.setInt('minutes', minutes);
+    await prefs.setInt('seconds', seconds);
+    await prefs.setString('tag', _selectedTag ?? '');
+    await prefs.setString('focusText', _textController.text); // 集中したいテキストを保存
+  }
 
   // タイマーのカウントダウンの更新
   void _startTimer() {
@@ -57,19 +100,7 @@ class _MyHomePageState extends State<MyHomePage> {
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_totalSeconds > 0) {
         setState(() {
-          if (_totalSeconds % 2 == 0) {
-            if (t == 0) {
-              t+=1;
-              // 何かの条件で変更する場合
-            } else {
-              t -= 1;
-            }
-
-
-          }
-
           _totalSeconds--;
-          print(_totalSeconds);
         });
       } else {
         _timer?.cancel();
@@ -78,9 +109,12 @@ class _MyHomePageState extends State<MyHomePage> {
         });
       }
     });
+
+    _saveSettings(); // 設定を保存
+    _addTimerHistory(); // タイマー履歴を追加
   }
 
-  // カウントアップタイマーの更新
+  // タイマーのカウントアップの更新
   void _startCountUpTimer() {
     if (_isRunning) return;
     setState(() {
@@ -91,9 +125,11 @@ class _MyHomePageState extends State<MyHomePage> {
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       setState(() {
         _elapsedSeconds++;
-        print(_elapsedSeconds);
       });
     });
+
+    _saveSettings(); // 設定を保存
+    _addTimerHistory(); // タイマー履歴を追加
   }
 
   // ポモドーロタイマーの動作（25分間カウントダウン）
@@ -108,7 +144,6 @@ class _MyHomePageState extends State<MyHomePage> {
       if (_totalSeconds > 0) {
         setState(() {
           _totalSeconds--;
-          print(_totalSeconds);
         });
       } else {
         _timer?.cancel();
@@ -117,6 +152,9 @@ class _MyHomePageState extends State<MyHomePage> {
         });
       }
     });
+
+    _saveSettings(); // 設定を保存
+    _addTimerHistory(); // タイマー履歴を追加
   }
 
   // 時間のフォーマット（時間, 分, 秒）
@@ -152,6 +190,24 @@ class _MyHomePageState extends State<MyHomePage> {
     _timer?.cancel();
   }
 
+  // アプリ起動回数のインクリメント
+  Future<void> _incrementAppLaunchCount() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    int appLaunchCount = prefs.getInt('appLaunchCount') ?? 0;
+    await prefs.setInt('appLaunchCount', appLaunchCount + 1);
+  }
+
+  // タイマー履歴の追加
+  Future<void> _addTimerHistory() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    List<String> timerHistoryList = prefs.getStringList('timerHistoryList') ?? [];
+
+    // 新しいタイマー履歴をJSON形式の文字列として保存
+    String newHistory = '{"mode": ${mode.index}, "hours": $hours, "minutes": $minutes, "seconds": $seconds, "tag": "${_selectedTag ?? ""}", "focusText": "${_textController.text}", "startTime": "${DateTime.now().toIso8601String()}"}';
+    timerHistoryList.add(newHistory);
+    await prefs.setStringList('timerHistoryList', timerHistoryList);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -167,28 +223,37 @@ class _MyHomePageState extends State<MyHomePage> {
                 // TimerSettings画面を開き、設定を変更する
                 final result = await Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const TimerSettings()),
+                  MaterialPageRoute(builder: (context) => TimerSettings(
+                    // 初期値として現在の設定を渡す
+                    initialMode: mode,
+                    initialHours: hours,
+                    initialMinutes: minutes,
+                    initialSeconds: seconds,
+                  )),
                 );
                 if (result != null) {
                   setState(() {
-                    mode = result['mode']; // モードを設定
-                    hours = result['hours']; // 時間を設定
-                    minutes = result['minutes']; // 分を設定
-                    seconds = result['seconds']; // 秒を設定
+                    mode = result['mode'];
+                    hours = result['hours'];
+                    minutes = result['minutes'];
+                    seconds = result['seconds'];
+                    _selectedTag = result['tag']; // 選択されたタグを取得
+                    // タイマーモードに応じた初期設定
                     if (mode == TimerMode.countdown) {
-                      _totalSeconds = (hours * 3600) + (minutes * 60) + seconds; // カウントダウン
+                      _totalSeconds = (hours * 3600) + (minutes * 60) + seconds;
                     } else if (mode == TimerMode.countup) {
-                      _elapsedSeconds = 0; // カウントアップは常に0からスタート
+                      _elapsedSeconds = 0;
                     } else if (mode == TimerMode.pomodoro) {
-                      _totalSeconds = 25 * 60; // ポモドーロは25分
+                      _totalSeconds = 25 * 60;
                     }
                   });
+                  _saveSettings(); // 設定を保存
                 }
               },
               child: Text(
                 mode == TimerMode.countup
-                    ? _formatTime(_elapsedSeconds) // カウントアップの時間表示
-                    : _formatTime(_totalSeconds), // カウントダウンまたはポモドーロの時間表示
+                    ? _formatTime(_elapsedSeconds)
+                    : _formatTime(_totalSeconds),
                 style: Theme.of(context).textTheme.headlineMedium,
               ),
             ),
@@ -196,7 +261,30 @@ class _MyHomePageState extends State<MyHomePage> {
             const Text('花の名前を入力:'),
             TextField(
               controller: _textController,
-              decoration: InputDecoration(hintText: "集中したいテキストを入力"),
+              decoration: const InputDecoration(hintText: "集中したいテキストを入力"),
+            ),
+            const SizedBox(height: 20),
+            // スプリットボタン（ドロップダウンリスト）
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                PopupMenuButton<String>(
+                  onSelected: (String value) {
+                    setState(() {
+                      _selectedTag = value; // 選択されたタグを更新
+                    });
+                    print('選択されたタグ: $_selectedTag');
+                  },
+                  itemBuilder: (BuildContext context) {
+                    return tags.map((String tag) {
+                      return PopupMenuItem<String>(
+                        value: tag,
+                        child: Text(tag),
+                      );
+                    }).toList();
+                  },
+                ),
+              ],
             ),
             const SizedBox(height: 20),
             Row(
@@ -204,20 +292,13 @@ class _MyHomePageState extends State<MyHomePage> {
               children: [
                 ElevatedButton(
                   onPressed: () {
-                    // 入力されたテキストを参照
                     String userInput = _textController.text;
                     print("ユーザーの入力: $userInput");
-                    print(t);
-                    // if (t == 0) {
-                    //   // 何かの条件で変更する場合
-                    // } else {
-                    //   t -= 1;
-                    // }
 
                     // タイマーのモードに応じてスタート処理
                     setState(() {
                       if (mode == TimerMode.countdown) {
-                        _startTimer(); // カウントダウンタイマー開始
+                        _startTimer();
                       } else if (mode == TimerMode.countup) {
                         _startCountUpTimer(); // カウントアップタイマー開始
                       } else if (mode == TimerMode.pomodoro) {
@@ -248,10 +329,7 @@ class _MyHomePageState extends State<MyHomePage> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: <Widget>[
             IconButton(
-              icon: const Icon(
-                Icons.person_outline,
-                color: Colors.blue,
-              ),
+              icon: const Icon(Icons.person_outline, color: Colors.blue),
               onPressed: () {
                 Navigator.push(
                   context,
@@ -260,26 +338,26 @@ class _MyHomePageState extends State<MyHomePage> {
               },
             ),
             IconButton(
-              icon: const Icon(
-                Icons.access_alarms,
-                color: Colors.blue,
-              ),
+              icon: const Icon(Icons.access_alarms, color: Colors.blue),
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const TimerSettings()),
+                  MaterialPageRoute(builder: (context) => TimerSettings(
+                    // 初期値として現在の設定を渡す
+                    initialMode: mode,
+                    initialHours: hours,
+                    initialMinutes: minutes,
+                    initialSeconds: seconds,
+                  )),
                 );
               },
             ),
             IconButton(
-              icon: const Icon(
-                Icons.eco,
-                color: Colors.blue,
-              ),
+              icon: const Icon(Icons.eco, color: Colors.blue),
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => Flower(t: t)), // 修正されたクラス名
+                  MaterialPageRoute(builder: (context) => Flower(t: t, selectedTag: _selectedTag ?? '', focusText: _textController.text)), // 選択されたタグと集中したいテキストをflowerに渡す
                 );
               },
             ),
